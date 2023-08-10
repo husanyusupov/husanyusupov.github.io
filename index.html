@@ -87,7 +87,8 @@
             },
             params: {
                 code: (context) => context.code
-            }
+            },
+	        then: (data, context) => context.result = data
         }
     ];
 
@@ -97,8 +98,7 @@
 
     const state = initState({
         buttonDisabled: false,
-        statusText: '',
-        result: ''
+        statusText: ''
     });
 
     elementButton.addEventListener('click', start);
@@ -118,6 +118,7 @@
             const [url, options] = getFetchParams(step, context);
             console.log([url, options]);
             try {
+                state.statusText = `${step.name}...`;
                 const data = await fetch(url, options);
                 if (typeof step.then === 'function') {
                     step.then(data, context);
@@ -128,55 +129,50 @@
             }
         }
 
+        if (context.result) {
+            elementTextarea.value = context.result;
+        }
+
         state.buttonDisabled = false;
+        state.statusText = '';
     }
 
     function getFetchParams(step, context) {
-        let url = baseUrl;
+        let url = baseUrl + step.api;
         let options = {};
 
         options.method = step.method || 'GET';
         options.mode = 'no-cors';
+        options.credentials = 'include';
 
         if (!step.api) {
             throw Error(`Для апи ${step.name} не предоставлен путь апи`);
         }
 
-        url += step.api;
-
         if (step.params) {
-            let pairs = [];
-            for (const paramsKey in step.params) {
-                if (step.params.hasOwnProperty(paramsKey)) {
-                    const param = step.params[paramsKey];
-                    if (typeof param === 'function') {
-                        pairs.push(`${paramsKey}=${param(context)}`);
-                    }
-                    if (typeof param === 'string' || typeof param === 'number') {
-                        pairs.push(`${paramsKey}=${param}`);
-                    }
-                }
-            }
+            const searchParams = new URLSearchParams();
 
-            if (pairs.length) {
-                url += `?${pairs.join('&')}`;
-            }
+            Object.keys(step.params).forEach(key => {
+                const param = step.params[key];
+                searchParams.append(key, typeof param === 'function' ? param(context) : param);
+            });
+
+            url += '?' + searchParams.toString();
         }
+
+        const headers = new Headers();
+        headers.append('Content-Type', 'application/json');
+        headers.append('Accept', 'application/json');
+        headers.append('Access-Control-Allow-Credentials', 'true');
 
         if (step.headers) {
-            options.headers = {};
-            for (const headersKey in step.headers) {
-	            if (step.headers.hasOwnProperty(headersKey)) {
-                    const header = step.headers[headersKey];
-                    if (typeof header === 'function') {
-                        options.headers[headersKey] = header(context);
-                    }
-                    if (typeof header === 'string' || typeof header === 'number') {
-                        options.headers[headersKey] = header;
-                    }
-	            }
-            }
+            Object.keys(step.headers).forEach(key => {
+                const header = step.headers[key];
+                headers.append(key, typeof header === 'function' ? header(context) : header);
+            })
         }
+
+        options.headers = headers;
 
         return [url, options];
     }
