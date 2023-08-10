@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Получение данных из https://emcapi.utg.uz</title>
+	<style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .main {
+            width: 500px;
+            margin: 10vh auto;
+        }
+
+        .controls {
+            margin-bottom: 2rem;
+        }
+
+        .button {
+            font-size: 1.25em;
+            color: #fff;
+            background-color: #327fc7;
+            outline: none;
+            border-radius: 5px;
+            border: none;
+            padding: 1em 2em;
+        }
+
+        .button:active {
+            background-color: #2b6aa6;
+        }
+
+        .textarea {
+            width: 100%;
+            min-height: 30em;
+            font-size: inherit;
+            font-family: inherit;
+            margin: .5em 0;
+            padding: .5em;
+        }
+	</style>
+</head>
+<body>
+<div class="main">
+	<div class="controls">
+		<button class="button" id="button">Получить код</button>
+		<span class="status" id="status"></span>
+	</div>
+	<div class="console">
+		<label for="textarea">Код:</label><br>
+		<textarea class="textarea" id="textarea" readonly>lorem ipsum</textarea>
+	</div>
+</div>
+<script type="module">
+    const login = 'ferganazot';
+    const password = 'ferganazot_2023';
+    const baseUrl = 'https://emcapi.utg.uz/api/v3';
+    const steps = [
+        {
+            name: 'authorization',
+            api: '/auth/token',
+            params: {login, password},
+            then: (data, context) => context.token = data
+        },
+        {
+            name: 'get code',
+            api: '/points',
+            headers: {
+                'AUTHORIZATION': (context) => `Bearer\n${context.token}`
+            },
+            then: (data, context) => context.code = data[0]
+        },
+        {
+            name: 'get info',
+            api: '/point',
+            headers: {
+                'AUTHORIZATION': (context) => `Bearer\n${context.token}`
+            },
+            params: {
+                code: (context) => context.code
+            }
+        }
+    ];
+
+    const elementButton = document.getElementById('button');
+    const elementState = document.getElementById('status');
+    const elementTextarea = document.getElementById('textarea');
+
+    const state = initState({
+        buttonDisabled: false,
+        statusText: '',
+        result: ''
+    });
+
+    elementButton.addEventListener('click', start);
+
+    async function start() {
+        if (state.buttonDisabled) {
+            return;
+        }
+
+        state.buttonDisabled = true;
+
+        let stepIndex = -1;
+        let context = {};
+
+        while (++stepIndex < steps.length) {
+            const step = steps[stepIndex];
+            const [url, options] = getFetchParams(step, context);
+            console.log([url, options]);
+            try {
+                const data = await fetch(url, options);
+                if (typeof step.then === 'function') {
+                    step.then(data, context);
+                }
+            } catch (e) {
+	            alert(e.message);
+                break;
+            }
+        }
+
+        state.buttonDisabled = false;
+    }
+
+    function getFetchParams(step, context) {
+        let url = baseUrl;
+        let options = {};
+
+        options.method = step.method || 'GET';
+
+        if (!step.api) {
+            throw Error(`Для апи ${step.name} не предоставлен путь апи`);
+        }
+
+        url += step.api;
+
+        if (step.params) {
+            let pairs = [];
+            for (const paramsKey in step.params) {
+                if (step.params.hasOwnProperty(paramsKey)) {
+                    const param = step.params[paramsKey];
+                    if (typeof param === 'function') {
+                        pairs.push(`${paramsKey}=${param(context)}`);
+                    }
+                    if (typeof param === 'string' || typeof param === 'number') {
+                        pairs.push(`${paramsKey}=${param}`);
+                    }
+                }
+            }
+
+            if (pairs.length) {
+                url += `?${pairs.join('&')}`;
+            }
+        }
+
+        if (step.headers) {
+            options.headers = {};
+            for (const headersKey in step.headers) {
+	            if (step.headers.hasOwnProperty(headersKey)) {
+                    const header = step.headers[headersKey];
+                    if (typeof header === 'function') {
+                        options.headers[headersKey] = header(context);
+                    }
+                    if (typeof header === 'string' || typeof header === 'number') {
+                        options.headers[headersKey] = header;
+                    }
+	            }
+            }
+        }
+
+        return [url, options];
+    }
+
+    function initState(initial) {
+        return new Proxy(initial, {
+            set(...args) {
+                requestAnimationFrame(update);
+                return Reflect.set(...args);
+            }
+        })
+    }
+
+    function update() {
+        elementButton.disabled = state.buttonDisabled;
+        elementState.innerText = state.statusText;
+        elementTextarea.value = state.result;
+    }
+
+
+</script>
+</body>
+</html>
