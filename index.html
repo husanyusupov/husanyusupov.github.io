@@ -168,7 +168,9 @@
         if (step.headers) {
             Object.keys(step.headers).forEach(key => {
                 const header = step.headers[key];
-                headers.append(key, typeof header === 'function' ? header(context) : header);
+                const value = typeof header === 'function' ? header(context) : header;
+                console.log(header, value);
+                headers.append(key, value);
             })
         }
 
