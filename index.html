@@ -119,7 +119,10 @@
             console.log([url, options]);
             try {
                 state.statusText = `${step.name}...`;
-                const data = await fetch(url, options);
+                const response = await fetch(url, options);
+                console.log(response);
+                const data = await response.json();
+                console.log(data);
                 if (typeof step.then === 'function') {
                     step.then(data, context);
                 }
@@ -142,7 +145,7 @@
         let options = {};
 
         options.method = step.method || 'GET';
-        options.mode = 'no-cors';
+        // options.mode = 'no-cors';
         options.credentials = 'include';
 
         if (!step.api) {
