@@ -136,6 +136,7 @@
         let options = {};
 
         options.method = step.method || 'GET';
+        options.mode = 'no-cors';
 
         if (!step.api) {
             throw Error(`Для апи ${step.name} не предоставлен путь апи`);
